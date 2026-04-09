@@ -8,6 +8,8 @@ import AnalysisChamber from './components/AnalysisChamber';
 import ScamResult, { type ScamAnalysis } from './components/ScamResult';
 import HistoryView from './components/HistoryView';
 import EmergencyModal from './components/EmergencyModal';
+import ThreatMap from './components/ThreatMap';
+import IntelligenceView from './components/IntelligenceView';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -274,6 +276,10 @@ export default function App() {
                   }
                 }}
               />
+            ) : currentView === 'Threat Map' ? (
+              <ThreatMap />
+            ) : currentView === 'Intelligence' ? (
+              <IntelligenceView />
             ) : (
               <div className="py-20 text-center">
                 <h2 className="font-sans font-black text-5xl uppercase tracking-tighter mb-4">{currentView}</h2>
