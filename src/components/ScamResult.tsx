@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { motion } from 'motion/react';
 import { AlertCircle, CheckCircle2, ShieldAlert, Globe, Zap } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -16,16 +17,23 @@ export interface ScamAnalysis {
   analysis_english: string;
   risk_heatmap: RiskHeatmapItem[];
   report_id?: string;
+  timestamp?: number;
 }
 
 interface ScamResultProps {
   analysis: ScamAnalysis;
   onReset: () => void;
+  onPlayAudio: () => void;
+  isAudioPlaying: boolean;
 }
 
-export default function ScamResult({ analysis, onReset }: ScamResultProps) {
+export default function ScamResult({ analysis, onReset, onPlayAudio, isAudioPlaying }: ScamResultProps) {
   const isScam = analysis.verdict === 'SCAM';
   const isSuspicious = analysis.verdict === 'SUSPICIOUS';
+
+  useEffect(() => {
+    // Optional: Auto-play is handled in App.tsx, but we could add logic here if needed.
+  }, []);
 
   return (
     <div className="relative w-full max-w-5xl mx-auto py-8 px-4">
@@ -73,9 +81,22 @@ export default function ScamResult({ analysis, onReset }: ScamResultProps) {
               <div className="absolute top-0 right-0 p-2 opacity-10">
                 <Zap className="w-12 h-12 text-gold" />
               </div>
-              <p className="font-sans text-2xl font-medium leading-tight mb-4 italic text-gold">
-                "{analysis.analysis_twi}"
-              </p>
+              <div className="flex justify-between items-start gap-4 mb-4">
+                <p className="font-sans text-2xl font-medium leading-tight italic text-gold">
+                  "{analysis.analysis_twi}"
+                </p>
+                <button 
+                  onClick={onPlayAudio}
+                  disabled={isAudioPlaying}
+                  className={cn(
+                    "p-3 rounded-full transition-all shrink-0",
+                    isAudioPlaying ? "bg-gold/20 text-gold animate-pulse" : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+                  )}
+                  title="Listen in Twi"
+                >
+                  <Zap className={cn("w-5 h-5", isAudioPlaying && "fill-current")} />
+                </button>
+              </div>
               <p className="font-sans text-lg text-white/80 leading-relaxed">
                 {analysis.analysis_english}
               </p>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShieldAlert, Info, MapPin, Menu, X, Bell } from 'lucide-react';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Modality } from '@google/genai';
 import { cn } from './lib/utils';
 import AdinkraBackground from './components/AdinkraBackground';
 import AnalysisChamber from './components/AnalysisChamber';
@@ -32,6 +32,55 @@ export default function App() {
   const [history, setHistory] = useState<ScamAnalysis[]>([]);
   const [currentView, setCurrentView] = useState<'Vault' | 'History' | 'Threat Map' | 'Intelligence'>('Vault');
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+
+  const playTwiAudio = async (twiText: string) => {
+    try {
+      setIsAudioPlaying(true);
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash-preview-tts",
+        contents: [{ parts: [{ text: `Say in a calm but firm protective tone in Twi: ${twiText}` }] }],
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: 'Kore' },
+            },
+          },
+        },
+      });
+
+      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (base64Audio) {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const binaryString = atob(base64Audio);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        const pcmData = new Int16Array(bytes.buffer);
+        const float32Data = new Float32Array(pcmData.length);
+        for (let i = 0; i < pcmData.length; i++) {
+          float32Data[i] = pcmData[i] / 32768;
+        }
+        
+        const audioBuffer = audioContext.createBuffer(1, float32Data.length, 24000);
+        audioBuffer.getChannelData(0).set(float32Data);
+        
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.destination);
+        source.onended = () => setIsAudioPlaying(false);
+        source.start();
+      } else {
+        setIsAudioPlaying(false);
+      }
+    } catch (error) {
+      console.error("TTS failed:", error);
+      setIsAudioPlaying(false);
+    }
+  };
 
   // Load history from localStorage
   useEffect(() => {
@@ -109,10 +158,14 @@ export default function App() {
       // Generate unique tamper-proof ID
       const reportId = `KKB-PROT-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
       
-      const finalResult = { ...result, report_id: reportId };
+      const finalResult: ScamAnalysis = { ...result, report_id: reportId, timestamp: Date.now() };
       setAnalysis(finalResult);
       setHistory(prev => [finalResult, ...prev]);
       setIsAnalyzing(false);
+
+      if (finalResult.verdict === 'SCAM') {
+        playTwiAudio(finalResult.analysis_twi);
+      }
 
     } catch (error) {
       console.error("Forensic analysis failed:", error);
@@ -129,10 +182,12 @@ export default function App() {
           { segment: "dial *170#", risk: "High" },
           { segment: "reversal request", risk: "High" }
         ],
-        report_id: `KKB-PROT-FAIL-${Date.now().toString(36).toUpperCase()}`
+        report_id: `KKB-PROT-FAIL-${Date.now().toString(36).toUpperCase()}`,
+        timestamp: Date.now()
       };
       setAnalysis(fallbackResult);
       setHistory(prev => [fallbackResult, ...prev]);
+      playTwiAudio(fallbackResult.analysis_twi);
     }
   };
 
@@ -251,7 +306,12 @@ export default function App() {
 
                 <AnimatePresence mode="wait">
                   {analysis ? (
-                    <ScamResult analysis={analysis} onReset={() => setAnalysis(null)} />
+                    <ScamResult 
+                      analysis={analysis} 
+                      onReset={() => setAnalysis(null)} 
+                      onPlayAudio={() => playTwiAudio(analysis.analysis_twi)}
+                      isAudioPlaying={isAudioPlaying}
+                    />
                   ) : (
                     <motion.div
                       initial={{ opacity: 0, scale: 0.95 }}
@@ -277,7 +337,7 @@ export default function App() {
                 }}
               />
             ) : currentView === 'Threat Map' ? (
-              <ThreatMap />
+              <ThreatMap history={history} />
             ) : currentView === 'Intelligence' ? (
               <IntelligenceView />
             ) : (
